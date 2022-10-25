@@ -2,10 +2,14 @@
 # -*- coding:utf-8 -*-
 # @Time  : 2022/10/24 09:44
 # @Author: lionel
+import os
+
 import torch
 from torch import nn
 
 from transformers import BertModel, BertTokenizer
+
+from datasets.duie import build_vocab
 
 
 class CasRel(nn.Module):
@@ -41,7 +45,9 @@ class CasRel(nn.Module):
 
 
 if __name__ == '__main__':
-    bert_model_path = '/Users/jiangfeng/Workspace/Data/LM/chinese-roberta-wwm-ext'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    bert_model_path = '/tmp/chinese-roberta-wwm-ext'
     texts = ['原告：张三', '被告：李四伍']
     sub_head = torch.tensor([[0, 0, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 1, 0, 0, 0]], dtype=torch.float)
     sub_tail = torch.tensor([[0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 1, 0]], dtype=torch.float)
@@ -49,6 +55,11 @@ if __name__ == '__main__':
     encoded_outputs = tokenizer(texts, return_tensors='pt', padding=True)
     token_ids, token_type_ids, attention_mask = encoded_outputs['input_ids'], encoded_outputs['token_type_ids'], \
                                                 encoded_outputs['attention_mask']
+    print(token_ids)
+    print(token_type_ids)
+    print(attention_mask)
     model = CasRel(bert_model_path, num_relations=2, bert_dim=768)
     pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids, attention_mask,
                                                                            sub_head, sub_tail)
+
+    vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
