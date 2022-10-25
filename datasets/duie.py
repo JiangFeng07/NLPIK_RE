@@ -4,14 +4,12 @@
 # @Author: lionel
 import json
 import os
-from collections import OrderedDict
 from random import choice
 
 import torch
 from torch.utils import data
-from transformers import BertTokenizer
 
-from models.casRel import MyLoss, CasRel
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class DuieDataset(data.Dataset):
@@ -39,11 +37,6 @@ class DuieDataset(data.Dataset):
         return len(self.data)
 
 
-bert_model_path = '/tmp/chinese-roberta-wwm-ext'
-tokenizer = BertTokenizer.from_pretrained(bert_model_path)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
 def get_start_end_index(word, text):
     word_chars = list(word)
     text_chars = list(text)
@@ -61,25 +54,12 @@ def get_start_end_index(word, text):
     return None
 
 
-def build_vocab(vocab_path):
-    vocab2id = OrderedDict()
-    with open(vocab_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            vocab2id[line.strip('\n')] = len(vocab2id)
-    id2vocab = {val: key for key, val in vocab2id.items()}
-    return vocab2id, id2vocab
-
-
-vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
-
-
-def collate_fn(batch):
+def collate_fn(batch, vocab, schema_data):
     """
 
     :param batch:
     :return:
     """
-    schema_data = json.load(open('../data/schema.json', 'r'))
     rel_nums = len(schema_data['predicates'])
     texts, rels = zip(*batch)
 
@@ -161,35 +141,46 @@ def schema_process(schema_file_path):
 
 
 if __name__ == '__main__':
+    from utils import build_vocab
+
+    bert_model_path = '/tmp/chinese-roberta-wwm-ext'
+
+    vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
+
+    #     from models.casRel import MyLoss, CasRel
     schema_data = json.load(open('../data/schema.json', 'r'))
     train_file_path = '/tmp/DuIE2.0/duie_train.json/duie_train.json'
-    # dev_file_path = '/tmp/DuIE2.0/duie_dev.json/duie_dev.json'
-    # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
-
+    #     # dev_file_path = '/tmp/DuIE2.0/duie_dev.json/duie_dev.json'
+    #     # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
+    #
     train_dataset = DuieDataset(train_file_path, schema_data)
-    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=10, collate_fn=collate_fn)
-    count = 0
-    for index, ele in enumerate(train_dataloader):
-        texts, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = ele
-
-        loss = MyLoss(attention_mask)
-
-        model = CasRel(bert_model_path, num_relations=48, bert_dim=768)
-        pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids,
-                                                                               attention_mask,
-                                                                               sub_heads, sub_tails)
-
-        # print(loss.loss_fn(pred_sub_heads, sub_heads))
-        # print(loss.loss_fn(pred_sub_tails, sub_tails))
-        print(pred_obj_heads.size())
-        print(obj_heads.size())
-        print(loss.loss_fn(pred_obj_heads, obj_heads))
-        print(loss.loss_fn(pred_obj_tails, obj_tails))
-        # print(sub_tails)
-        # print(obj_tails[0][7])
-        # print(obj_heads[0][7])
+    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=10,
+                                       collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
+    for ele in train_dataloader:
+        print(ele)
         break
-
-    import torch.nn.functional as F
-
-    from torch.nn import BCELoss
+#     count = 0
+#     for index, ele in enumerate(train_dataloader):
+#         texts, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = ele
+#
+#         loss = MyLoss(attention_mask)
+#
+#         model = CasRel(bert_model_path, num_relations=48, bert_dim=768)
+#         pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids,
+#                                                                                attention_mask,
+#                                                                                sub_heads, sub_tails)
+#
+#         # print(loss.loss_fn(pred_sub_heads, sub_heads))
+#         # print(loss.loss_fn(pred_sub_tails, sub_tails))
+#         print(pred_obj_heads.size())
+#         print(obj_heads.size())
+#         print(loss.loss_fn(pred_obj_heads, obj_heads))
+#         print(loss.loss_fn(pred_obj_tails, obj_tails))
+#         # print(sub_tails)
+#         # print(obj_tails[0][7])
+#         # print(obj_heads[0][7])
+#         break
+#
+#     import torch.nn.functional as F
+#
+#     from torch.nn import BCELoss

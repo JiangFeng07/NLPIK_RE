@@ -8,8 +8,7 @@ import torch
 from torch import nn
 
 from transformers import BertModel, BertTokenizer
-
-from datasets.duie import build_vocab
+import torch.nn.functional as F
 
 
 class CasRel(nn.Module):
@@ -44,6 +43,36 @@ class CasRel(nn.Module):
         return pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails
 
 
+class MyLoss(nn.Module):
+    def __init__(self, mask):
+        super(MyLoss, self).__init__()
+        self.mask = mask
+        self.mask2 = mask.unsqueeze(-1)
+
+    def loss_fn(self, predict_label, gold_label):
+        """
+
+        :param predict_label: 预测结果 （batch_size, seq, 1）
+        :param gold_label: 真实标签（batch_size, seq）
+        :param mask: (batch_size, seq)
+        :return: bce loss
+        """
+        predict_label = predict_label.squeeze(-1)
+        loss = F.binary_cross_entropy(predict_label, gold_label, reduction='none')
+        if self.mask.shape == loss.shape:
+            loss = torch.sum(self.mask * loss) / torch.sum(self.mask)
+        else:
+            loss = torch.sum(self.mask2 * loss) / torch.sum(self.mask2)
+        return loss
+
+    def forward(self, predict_label, gold_label):
+        sub_heads_loss = self.loss_fn(predict_label['pred_sub_heads'], gold_label['sub_heads'])
+        sub_tails_loss = self.loss_fn(predict_label['pred_sub_tails'], gold_label['sub_tails'])
+        obj_heads_loss = self.loss_fn(predict_label['pred_obj_heads'], gold_label['obj_heads'])
+        obj_tails_loss = self.loss_fn(predict_label['pred_obj_tails'], gold_label['obj_tails'])
+        return sub_heads_loss + sub_tails_loss + obj_heads_loss + obj_tails_loss
+
+
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -58,8 +87,14 @@ if __name__ == '__main__':
     print(token_ids)
     print(token_type_ids)
     print(attention_mask)
-    model = CasRel(bert_model_path, num_relations=2, bert_dim=768)
+    model = CasRel(bert_model_path, num_relations=48, bert_dim=768)
     pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids, attention_mask,
                                                                            sub_head, sub_tail)
+    print(pred_obj_heads)
 
-    vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
+    # input = torch.randn((2, 2), requires_grad=True)
+    # target = torch.rand((2, 2), requires_grad=False)
+    # loss = F.binary_cross_entropy(F.sigmoid(input), target, reduction='none')
+    # print(torch.sum(loss) / 4)
+    # loss = F.binary_cross_entropy(F.sigmoid(input), target)
+    # print(loss)
