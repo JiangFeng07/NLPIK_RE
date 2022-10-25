@@ -12,13 +12,12 @@ from utils import build_vocab
 from datasets.duie import DuieDataset, collate_fn
 from models.casRel import MyLoss, CasRel
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 if __name__ == '__main__':
     bert_model_path = '/tmp/chinese-roberta-wwm-ext'
 
-    schema_data = json.load(open('./data/schema.json', 'r'))
     vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     schema_data = json.load(open('./data/schema.json', 'r'))
     train_file_path = '/tmp/DuIE2.0/duie_train.json/duie_train.json'
