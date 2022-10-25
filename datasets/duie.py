@@ -11,6 +11,8 @@ import torch
 from torch.utils import data
 from transformers import BertTokenizer
 
+from models.casRel import MyLoss, CasRel
+
 
 class DuieDataset(data.Dataset):
     def __init__(self, file_path, schema_data):
@@ -37,7 +39,7 @@ class DuieDataset(data.Dataset):
         return len(self.data)
 
 
-bert_model_path = '/Users/jiangfeng/Workspace/Data/LM/chinese-roberta-wwm-ext'
+bert_model_path = '/tmp/chinese-roberta-wwm-ext'
 tokenizer = BertTokenizer.from_pretrained(bert_model_path)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -101,8 +103,8 @@ def collate_fn(batch):
 
     sub_heads = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
     sub_tails = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
-    obj_heads = torch.zeros((batch_size, rel_nums, seq_len), dtype=torch.float, device=device)
-    obj_tails = torch.zeros((batch_size, rel_nums, seq_len), dtype=torch.float, device=device)
+    obj_heads = torch.zeros((batch_size, seq_len, rel_nums), dtype=torch.float, device=device)
+    obj_tails = torch.zeros((batch_size, seq_len, rel_nums), dtype=torch.float, device=device)
 
     for index, rel in enumerate(rels):
         subjects = set()
@@ -128,8 +130,8 @@ def collate_fn(batch):
                 for object in ele['objects']:
                     position = get_start_end_index(object, text)
                     start, end = position
-                    obj_heads[index][predicate][start + 1] = 1.0  # 考虑bert预训练模型在句子首部添加[CLS]
-                    obj_tails[index][predicate][end] = 1.0  # re.finditer函数本身字符结尾（ele.end()）索引就多一位
+                    obj_heads[index][start + 1][predicate] = 1.0  # 考虑bert预训练模型在句子首部添加[CLS]
+                    obj_tails[index][end][predicate] = 1.0  # re.finditer函数本身字符结尾（ele.end()）索引就多一位
 
     return texts, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails
 
@@ -165,13 +167,29 @@ if __name__ == '__main__':
     # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
 
     train_dataset = DuieDataset(train_file_path, schema_data)
-    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=2, collate_fn=collate_fn)
+    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=10, collate_fn=collate_fn)
     count = 0
     for index, ele in enumerate(train_dataloader):
         texts, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = ele
-        print(token_ids)
-        print(sub_heads)
-        print(sub_tails)
-        print(obj_tails[0][7])
-        print(obj_heads[0][7])
+
+        loss = MyLoss(attention_mask)
+
+        model = CasRel(bert_model_path, num_relations=48, bert_dim=768)
+        pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids,
+                                                                               attention_mask,
+                                                                               sub_heads, sub_tails)
+
+        # print(loss.loss_fn(pred_sub_heads, sub_heads))
+        # print(loss.loss_fn(pred_sub_tails, sub_tails))
+        print(pred_obj_heads.size())
+        print(obj_heads.size())
+        print(loss.loss_fn(pred_obj_heads, obj_heads))
+        print(loss.loss_fn(pred_obj_tails, obj_tails))
+        # print(sub_tails)
+        # print(obj_tails[0][7])
+        # print(obj_heads[0][7])
         break
+
+    import torch.nn.functional as F
+
+    from torch.nn import BCELoss
