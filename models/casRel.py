@@ -33,10 +33,6 @@ class CasRel(nn.Module):
         return pred_sub_heads, pred_sub_tails
 
     def forward(self, token_ids, token_type_ids, attention_mask, sub_head, sub_tail):
-        # encoded_text = \
-        #     self.bert_model(input_ids=token_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)[
-        #         0]  # (batch_size, seq, bert_dim )
-
         # subject预测
         pred_sub_heads, pred_sub_tails = self.get_subs(token_ids, token_type_ids, attention_mask)
 
