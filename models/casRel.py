@@ -22,21 +22,30 @@ class CasRel(nn.Module):
         self.obj_heads_linear = nn.Linear(self.bert_dim, self.num_relations)
         self.obj_tails_linear = nn.Linear(self.bert_dim, self.num_relations)
 
-    def forward(self, token_ids, token_type_ids, attention_mask, sub_head, sub_tail):
-        encoded_text = \
+    def get_subs(self, token_ids, token_type_ids, attention_mask):
+        self.encoded_text = \
             self.bert_model(input_ids=token_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)[
                 0]  # (batch_size, seq, bert_dim )
 
         # subject预测
-        pred_sub_heads = torch.sigmoid(self.sub_heads_linear(encoded_text))
-        pred_sub_tails = torch.sigmoid(self.sub_tails_linear(encoded_text))
+        pred_sub_heads = torch.sigmoid(self.sub_heads_linear(self.encoded_text))
+        pred_sub_tails = torch.sigmoid(self.sub_tails_linear(self.encoded_text))
+        return pred_sub_heads, pred_sub_tails
+
+    def forward(self, token_ids, token_type_ids, attention_mask, sub_head, sub_tail):
+        # encoded_text = \
+        #     self.bert_model(input_ids=token_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)[
+        #         0]  # (batch_size, seq, bert_dim )
+
+        # subject预测
+        pred_sub_heads, pred_sub_tails = self.get_subs(token_ids, token_type_ids, attention_mask)
 
         # object预测
         sub_head_mapping = sub_head.unsqueeze(1)  # (batch_size, seq)->(batch_size, 1, seq)
         sub_tail_mapping = sub_tail.unsqueeze(1)  # (batch_size, seq)->(batch_size, 1, seq)
-        sub_head = torch.matmul(sub_head_mapping, encoded_text)
-        sub_tail = torch.matmul(sub_tail_mapping, encoded_text)
-        encoded_text = (sub_head + sub_tail) / 2 + encoded_text
+        sub_head = torch.matmul(sub_head_mapping, self.encoded_text)
+        sub_tail = torch.matmul(sub_tail_mapping, self.encoded_text)
+        encoded_text = (sub_head + sub_tail) / 2 + self.encoded_text
         pred_obj_heads = torch.sigmoid(self.obj_heads_linear(encoded_text))
         pred_obj_tails = torch.sigmoid(self.obj_tails_linear(encoded_text))
 
