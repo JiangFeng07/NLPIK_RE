@@ -54,15 +54,7 @@ def get_start_end_index(word, text):
     return None
 
 
-def collate_fn(batch, vocab, schema_data):
-    """
-
-    :param batch:
-    :return:
-    """
-    rel_nums = len(schema_data['predicates'])
-    texts, rels = zip(*batch)
-
+def tokenizer(texts, vocab):
     batch_size = len(texts)
     seq_len = max([len(text) for text in texts]) + 2
 
@@ -80,6 +72,21 @@ def collate_fn(batch, vocab, schema_data):
             i += 1
         token_ids[index][i + 1] = vocab['[SEP]']
         attention_mask[index][i + 1] = 1
+    return token_ids, token_type_ids, attention_mask
+
+
+def collate_fn(batch, vocab, schema_data):
+    """
+
+    :param batch:
+    :return:
+    """
+    rel_nums = len(schema_data['predicates'])
+    texts, rels = zip(*batch)
+
+    token_ids, token_type_ids, attention_mask = tokenizer(texts, vocab)
+
+    batch_size, seq_len = token_ids.size()
 
     sub_heads = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
     sub_tails = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
@@ -113,7 +120,7 @@ def collate_fn(batch, vocab, schema_data):
                     obj_heads[index][start + 1][predicate] = 1.0  # 考虑bert预训练模型在句子首部添加[CLS]
                     obj_tails[index][end][predicate] = 1.0  # re.finditer函数本身字符结尾（ele.end()）索引就多一位
 
-    return texts, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails
+    return texts, rels, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails
 
 
 def schema_process(schema_file_path):
@@ -154,10 +161,11 @@ if __name__ == '__main__':
     #     # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
     #
     train_dataset = DuieDataset(train_file_path, schema_data)
-    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=10,
+    train_dataloader = data.DataLoader(train_dataset, shuffle=False, batch_size=2,
                                        collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
     for ele in train_dataloader:
-        print(ele)
+        print(ele[0])
+        print(ele[1])
         break
 #     count = 0
 #     for index, ele in enumerate(train_dataloader):
