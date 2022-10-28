@@ -103,3 +103,5 @@ if __name__ == '__main__':
     # print(torch.sum(loss) / 4)
     # loss = F.binary_cross_entropy(F.sigmoid(input), target)
     # print(loss)
+
+    import tqdm

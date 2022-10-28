@@ -6,6 +6,7 @@ import json
 import os
 import torch
 from torch.utils import data
+from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
 from utils import build_vocab
 
@@ -51,19 +52,20 @@ def predict(texts, token_ids, token_type_ids, attention_mask, model, id2label, h
 
 def metric(dataloader, id2label):
     correct_num, predict_num, gold_num = 0, 0, 0
-    for batch in dataloader:
-        texts, rels, token_ids, token_type_ids, attention_mask = batch[:5]
-        _, pred_spo_list = predict(texts, token_ids, token_type_ids, attention_mask, model, id2label)
-        assert len(rels) == len(pred_spo_list) == 1
-        spo_list = set()
-        for ele in rels[0]:
-            rel = id2label[ele['predicate']]
-            sub = ele['subject']
-            for obj in ele['objects']:
-                spo_list.add((sub, rel, obj))
-        predict_num += len(pred_spo_list)
-        gold_num += len(spo_list)
-        correct_num += len(spo_list & pred_spo_list)
+    with tqdm(total=len(dataloader), desc='模型验证进度条') as pbar:
+        for batch in dataloader:
+            texts, rels, token_ids, token_type_ids, attention_mask = batch[:5]
+            _, pred_spo_list = predict(texts, token_ids, token_type_ids, attention_mask, model, id2label)
+            spo_list = set()
+            for ele in rels[0]:
+                rel = id2label[ele['predicate']]
+                sub = ele['subject']
+                for obj in ele['objects']:
+                    spo_list.add((sub, rel, obj))
+            predict_num += len(pred_spo_list)
+            gold_num += len(spo_list)
+            correct_num += len(spo_list & pred_spo_list)
+            pbar.update(1)
 
     print("correct_num: {:3d}, predict_num: {:3d}, gold_num: {:3d}".format(correct_num, predict_num, gold_num))
     precision = correct_num / (predict_num + 1e-10)
@@ -103,30 +105,34 @@ if __name__ == '__main__':
     epoch = 1
     while epoch <= epochs:
         model.train()
-        for batch in train_dataloader:
-            texts, rels, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = batch
+        with tqdm(total=len(train_dataloader), desc='模型训练进度条') as pbar:
+            for step, batch in train_dataloader:
+                texts, rels, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = batch
 
-            myLoss = MyLoss(attention_mask)
+                myLoss = MyLoss(attention_mask)
 
-            optimizer.zero_grad()
+                optimizer.zero_grad()
 
-            pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids,
-                                                                                   attention_mask,
-                                                                                   sub_heads, sub_tails)
-            predict_label, gold_label = dict(), dict()
-            predict_label['pred_sub_heads'] = pred_sub_heads
-            predict_label['pred_sub_tails'] = pred_sub_tails
-            predict_label['pred_obj_heads'] = pred_obj_heads
-            predict_label['pred_obj_tails'] = pred_obj_tails
+                pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids,
+                                                                                       attention_mask,
+                                                                                       sub_heads, sub_tails)
+                predict_label, gold_label = dict(), dict()
+                predict_label['pred_sub_heads'] = pred_sub_heads
+                predict_label['pred_sub_tails'] = pred_sub_tails
+                predict_label['pred_obj_heads'] = pred_obj_heads
+                predict_label['pred_obj_tails'] = pred_obj_tails
 
-            gold_label['sub_heads'] = sub_heads
-            gold_label['sub_tails'] = sub_tails
-            gold_label['obj_heads'] = obj_heads
-            gold_label['obj_tails'] = obj_tails
+                gold_label['sub_heads'] = sub_heads
+                gold_label['sub_tails'] = sub_tails
+                gold_label['obj_heads'] = obj_heads
+                gold_label['obj_tails'] = obj_tails
 
-            loss = myLoss(predict_label, gold_label)
-            loss.backward()
-            scheduler.step()
-            optimizer.step()
+                loss = myLoss(predict_label, gold_label)
+                pbar.set_postfix({'loss': '{0:1.5f}'.format(float(loss))})
+                pbar.update(1)
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
+
         with torch.no_grad():
             metric(dev_dataloader, id2label)
