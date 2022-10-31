@@ -96,12 +96,3 @@ if __name__ == '__main__':
     pred_sub_heads, pred_sub_tails, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids, attention_mask,
                                                                            sub_head, sub_tail)
     print(pred_obj_heads)
-
-    # input = torch.randn((2, 2), requires_grad=True)
-    # target = torch.rand((2, 2), requires_grad=False)
-    # loss = F.binary_cross_entropy(F.sigmoid(input), target, reduction='none')
-    # print(torch.sum(loss) / 4)
-    # loss = F.binary_cross_entropy(F.sigmoid(input), target)
-    # print(loss)
-
-    import tqdm
