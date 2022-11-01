@@ -66,17 +66,16 @@ def collate_fn(batch, tokenizer, tag2id_ent, rel2id):
     for index, eh_et in enumerate(eh_ets):
         for eh, et in eh_et:
             entities[index][shaking_head_tail_matrix_index['%d_%d' % (eh, et)]] = tag2id_ent['EH_ET']
+
     subj_head_obj_head_matrix = torch.zeros((batch_size, len(rel2id), shaking_seq_len))
     for index, sh_oh in enumerate(sh_ohs):
         for predicate, sh, oh, tag in sh_oh:
             subj_head_obj_head_matrix[index][predicate][shaking_head_tail_matrix_index['%d_%d' % (sh, oh)]] = tag
-
     for index, oh_sh in enumerate(oh_shs):
         for predicate, oh, sh, tag in oh_sh:
             subj_head_obj_head_matrix[index][predicate][shaking_head_tail_matrix_index['%d_%d' % (oh, sh)]] = tag
 
     subj_tail_obj_tail_matrix = torch.zeros((batch_size, len(rel2id), shaking_seq_len))
-
     for index, st_ot in enumerate(st_ots):
         for predicate, st, ot, tag in st_ot:
             subj_tail_obj_tail_matrix[index][predicate][shaking_head_tail_matrix_index['%d_%d' % (st, ot)]] = tag
