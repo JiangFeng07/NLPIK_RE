@@ -67,6 +67,19 @@ class TPLinkerBert(nn.Module):
         return entity_outputs, rel_head_outputs, rel_tail_outputs
 
 
+class TPLinkerLoss(nn.Module):
+    def __init__(self, mask):
+        super(TPLinkerLoss, self).__init__()
+        self.mask = mask
+
+    def forward(self, entities, pre_entities, rel_heads, pre_rel_heads, rel_tails, pre_rel_tails):
+        entity_loss = nn.CrossEntropyLoss(pre_entities.view(-1, pre_entities.size(-1)), entities.view(-1))
+        rel_heads_loss = nn.CrossEntropyLoss(rel_heads.view(-1, pre_rel_heads.size(-1)), rel_heads.view(-1))
+        rel_tails_loss = nn.CrossEntropyLoss(rel_heads.view(-1, pre_rel_tails.size(-1)), rel_tails.view(-1))
+
+        return entity_loss + rel_heads_loss + rel_tails_loss
+
+
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     bert_model_path = '/tmp/chinese-roberta-wwm-ext'
@@ -80,5 +93,6 @@ if __name__ == '__main__':
     entity_outputs, rel_head_outputs, rel_tail_outputs = tplinker(token_ids, token_type_ids, attention_mask)
     print(token_ids.size())
     print(entity_outputs.size())
+    print(entity_outputs.view(-1, entity_outputs.size(-1)).size())
     print(rel_head_outputs.size())
     print(rel_tail_outputs.size())

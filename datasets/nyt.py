@@ -83,7 +83,7 @@ def collate_fn(batch, tokenizer, tag2id_ent, rel2id):
         for predicate, ot, st, tag in ot_st:
             subj_tail_obj_tail_matrix[index][predicate][shaking_head_tail_matrix_index['%d_%d' % (ot, st)]] = tag
 
-    return entities, subj_head_obj_head_matrix, subj_tail_obj_tail_matrix
+    return token_ids, token_type_ids, attention_mask, entities, subj_head_obj_head_matrix, subj_tail_obj_tail_matrix
 
 
 if __name__ == '__main__':
@@ -97,5 +97,7 @@ if __name__ == '__main__':
                                                                      rel2id=rel2id))
 
     for ele in dataloader:
-        print(ele[1])
+        print(ele[3].size())
+        print(ele[4].size())
+        print(ele[5].size())
         break
