@@ -11,7 +11,7 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 from utils import build_vocab
 
 from datasets.duie import DuieDataset, collate_fn
-from models.casRel import MyLoss, CasRel
+from models.casRel import MyLoss, CasRelBert
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     dev_dataset = DuieDataset(dev_file_path, schema_data)
     dev_dataloader = data.DataLoader(dev_dataset, collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
 
-    model = CasRel(bert_model_path, num_relations=len(schema_data['predicates']), bert_dim=768)
+    model = CasRelBert(bert_model_path, num_relations=len(schema_data['predicates']), bert_dim=768)
     optimizer = AdamW(model.parameters(), lr=1e-5, correct_bias=False)
 
     epochs = 10

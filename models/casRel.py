@@ -11,9 +11,9 @@ from transformers import BertModel, BertTokenizer
 import torch.nn.functional as F
 
 
-class CasRel(nn.Module):
+class CasRelBert(nn.Module):
     def __init__(self, bert_model_path, num_relations, bert_dim):
-        super(CasRel, self).__init__()
+        super(CasRelBert, self).__init__()
         self.num_relations = num_relations
         self.bert_dim = bert_dim
         self.bert_model = BertModel.from_pretrained(bert_model_path)
