@@ -13,6 +13,8 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_se
 
 
 class CasRelLstm(nn.Module):
+    """论文 《A Novel Cascade Binary Tagging Framework for Relational Triple Extraction》 之CasRelLstm模型复现
+    """
     def __init__(self, num_relations, vocab_size, embedding_size, hidden_size, number_layer, device):
         super(CasRelLstm, self).__init__()
         self.num_relations = num_relations
@@ -56,6 +58,8 @@ class CasRelLstm(nn.Module):
 
 
 class CasRelBert(nn.Module):
+    """论文 《A Novel Cascade Binary Tagging Framework for Relational Triple Extraction》之 CasRelBert 模型复现
+    """
     def __init__(self, bert_model_path, num_relations, bert_dim):
         super(CasRelBert, self).__init__()
         self.num_relations = num_relations

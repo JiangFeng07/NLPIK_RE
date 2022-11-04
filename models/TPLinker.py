@@ -36,6 +36,9 @@ class HandshakingKerner(nn.Module):
 
 
 class TPLinkerBert(nn.Module):
+    """论文 《TPLinker: Single-stage Joint Extraction of Entities and Relations Through Token Pair LinkingLinking》复现
+    """
+
     def __init__(self, encoder, hidden_size, shaking_type, rel_size):
         super(TPLinkerBert, self).__init__()
         self.encoder = encoder
