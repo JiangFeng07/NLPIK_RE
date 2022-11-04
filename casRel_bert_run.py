@@ -4,16 +4,66 @@
 # @Author: lionel
 import json
 import os
+from random import choice
+
 import torch
 from torch.utils import data
 from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
 from utils import build_vocab
 
-from datasets.duie import DuieDataset, collate_fn
+from datasets.duie import DuieDataset, get_start_end_index, tokenizer
 from models.casRel import MyLoss, CasRelBert
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+def collate_fn(batch, vocab, schema_data):
+    """
+
+    :param batch:
+    :return:
+    """
+    rel_nums = len(schema_data['predicates'])
+    texts, rels = zip(*batch)
+
+    token_ids, token_type_ids, attention_mask = tokenizer(texts, vocab)
+
+    batch_size, seq_len = token_ids.size()
+
+    sub_heads = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
+    sub_tails = torch.zeros((batch_size, seq_len), dtype=torch.float, device=device)
+    obj_heads = torch.zeros((batch_size, seq_len, rel_nums), dtype=torch.float, device=device)
+    obj_tails = torch.zeros((batch_size, seq_len, rel_nums), dtype=torch.float, device=device)
+
+    for index, rel in enumerate(rels):
+        subjects = set()
+        text = texts[index]
+        for ele in rel:
+            subject = ele['subject']
+            position = get_start_end_index(subject, text)
+            try:
+                start, end = position
+                sub_heads[index][start + 1] = 1.0  # 考虑bert预训练模型在句子首部添加[CLS]
+                sub_tails[index][end] = 1.0  # re.finditer函数本身字符结尾（ele.end()）索引就多一位
+                subjects.add(subject)
+            except:
+                print(subject, text)
+
+        if subjects:
+            random_subject = choice(list(subjects))  # 随机抽取一个subject， 进行关系抽取建模
+            for ele in rel:
+                subject = ele['subject']
+                if subject != random_subject:
+                    continue
+                predicate = ele['predicate']
+                for object in ele['objects']:
+                    position = get_start_end_index(object, text)
+                    start, end = position
+                    obj_heads[index][start + 1][predicate] = 1.0  # 考虑bert预训练模型在句子首部添加[CLS]
+                    obj_tails[index][end][predicate] = 1.0  # re.finditer函数本身字符结尾（ele.end()）索引就多一位
+
+    return texts, rels, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails
 
 
 def predict(texts, token_ids, token_type_ids, attention_mask, model, id2label, h_bar=0.5, t_bar=0.5):
@@ -38,8 +88,9 @@ def predict(texts, token_ids, token_type_ids, attention_mask, model, id2label, h
             sub_tail_mapping[subject_idx][0][subject[2]] = 1
         _, _, pred_obj_heads, pred_obj_tails = model(token_ids, token_type_ids, attention_mask,
                                                      sub_head_mapping, sub_tail_mapping)
-        obj_heads, obj_tails = torch.where(pred_obj_heads > h_bar), torch.where(pred_obj_tails > t_bar)
         for subject_idx, subject in enumerate(subjects):
+            obj_heads, obj_tails = torch.where(pred_obj_heads[subject_idx] > h_bar), torch.where(
+                pred_obj_tails[subject_idx] > t_bar)
             for obj_head, rel_head in zip(*obj_heads[1:3]):
                 for obj_tail, rel_tail in zip(*obj_tails[1:3]):
                     if obj_head <= obj_tail and rel_head == rel_tail:
@@ -65,7 +116,7 @@ def metric(dataloader, id2label):
             predict_num += len(pred_spo_list)
             gold_num += len(spo_list)
             correct_num += len(spo_list & pred_spo_list)
-            pbar.update(1)
+            pbar.update()
 
     print("correct_num: {:3d}, predict_num: {:3d}, gold_num: {:3d}".format(correct_num, predict_num, gold_num))
     precision = correct_num / (predict_num + 1e-10)
@@ -129,7 +180,7 @@ if __name__ == '__main__':
 
                 loss = myLoss(predict_label, gold_label)
                 pbar.set_postfix({'loss': '{0:1.5f}'.format(float(loss))})
-                pbar.update(1)
+                pbar.update()
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
