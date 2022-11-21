@@ -144,14 +144,13 @@ def train():
     model = CasRelBert(args.bert_model_path, num_relations=len(schema_data['predicates']), bert_dim=768)
     optimizer = AdamW(model.parameters(), lr=args.lr, correct_bias=False)
 
-    epochs = 10
 
     total_steps = len(train_dataloader) * args.epochs
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warm_up_ratio * total_steps,
                                                 num_training_steps=total_steps)
 
     epoch = 1
-    while epoch <= epochs:
+    while epoch <= args.epochs:
         model.train()
         with tqdm(total=len(train_dataloader), desc='Epoch：%d，模型训练进度条' % epoch) as pbar:
             for step, batch in train_dataloader:
