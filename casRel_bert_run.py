@@ -201,8 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_size', help='', type=int, default=200)
     parser.add_argument('--num_layers', help='', type=int, default=1)
     parser.add_argument('--lr', help='学习率', type=float, default=1e-3)
-    parser.add_argument('--mode', help='长文本处理方式', type=str, default='cut')
-    parser.add_argument('--model_path', help='模型存储路径', type=str, default='/tmp/bq_corpus/bq_sbert.pt')
+    parser.add_argument('--model_path', help='模型存储路径', type=str, default='/tmp/DuIE2.0/duie_re.pt')
     args = parser.parse_args()
 
     train()
