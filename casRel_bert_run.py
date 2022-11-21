@@ -102,7 +102,7 @@ def predict(texts, token_ids, token_type_ids, attention_mask, model, id2label, h
     return subjects, spo_list
 
 
-def metric(dataloader, id2label):
+def metric(dataloader, id2label, model):
     correct_num, predict_num, gold_num = 0, 0, 0
     with tqdm(total=len(dataloader), desc='模型验证进度条') as pbar:
         for batch in dataloader:
@@ -132,14 +132,12 @@ def train():
 
     schema_data = json.load(open('./data/schema.json', 'r'))
     id2label = {val: key for key, val in schema_data['predicates']}
-    dev_file_path = '/tmp/DuIE2.0/duie_dev.json/duie_dev.json'
-    # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
 
     train_dataset = DuieDataset(os.path.join(args.file_path, 'duie_train.json/duie_train.json'), schema_data)
     train_dataloader = data.DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size,
                                        collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
 
-    dev_dataset = DuieDataset(dev_file_path, schema_data)
+    dev_dataset = DuieDataset(os.path.join(args.file_path, 'duie_dev.json/duie_dev.json'), schema_data)
     dev_dataloader = data.DataLoader(dev_dataset, batch_size=args.batch_size,
                                      collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
 
@@ -186,7 +184,7 @@ def train():
                 scheduler.step()
 
         with torch.no_grad():
-            metric(dev_dataloader, id2label)
+            metric(dev_dataloader, id2label, model)
 
 
 if __name__ == '__main__':
