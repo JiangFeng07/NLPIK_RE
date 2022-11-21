@@ -146,8 +146,7 @@ def train():
 
     epochs = 10
 
-    total_steps = len(train_dataloader) // args.batch_size * args.epochs
-    total_steps = total_steps if len(train_dataloader) % args.batch_size == 0 else total_steps + 1
+    total_steps = len(train_dataloader) * args.epochs
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warm_up_ratio * total_steps,
                                                 num_training_steps=total_steps)
 
