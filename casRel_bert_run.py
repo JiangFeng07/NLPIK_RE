@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 # @Time  : 2022/10/25 22:47
 # @Author: lionel
+import argparse
 import json
 import os
 from random import choice
@@ -126,37 +127,36 @@ def metric(dataloader, id2label):
     return precision, recall, f1_score
 
 
-if __name__ == '__main__':
-    bert_model_path = '/tmp/chinese-roberta-wwm-ext'
-
-    vocab, _ = build_vocab(os.path.join(bert_model_path, 'vocab.txt'))
+def train():
+    vocab, _ = build_vocab(os.path.join(args.bert_model_path, 'vocab.txt'))
 
     schema_data = json.load(open('./data/schema.json', 'r'))
     id2label = {val: key for key, val in schema_data['predicates']}
-    train_file_path = '/tmp/DuIE2.0/duie_train.json/duie_train.json'
     dev_file_path = '/tmp/DuIE2.0/duie_dev.json/duie_dev.json'
     # test_file_path = '/tmp/DuIE2.0/duie_sample.json/duie_sample.json'
 
-    train_dataset = DuieDataset(train_file_path, schema_data)
-    train_dataloader = data.DataLoader(train_dataset, shuffle=True, batch_size=10,
+    train_dataset = DuieDataset(os.path.join(args.file_path, 'duie_train.json/duie_train.json'), schema_data)
+    train_dataloader = data.DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size,
                                        collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
 
     dev_dataset = DuieDataset(dev_file_path, schema_data)
-    dev_dataloader = data.DataLoader(dev_dataset, collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
+    dev_dataloader = data.DataLoader(dev_dataset, batch_size=args.batch_size,
+                                     collate_fn=lambda ele: collate_fn(ele, vocab, schema_data))
 
-    model = CasRelBert(bert_model_path, num_relations=len(schema_data['predicates']), bert_dim=768)
-    optimizer = AdamW(model.parameters(), lr=1e-5, correct_bias=False)
+    model = CasRelBert(args.bert_model_path, num_relations=len(schema_data['predicates']), bert_dim=768)
+    optimizer = AdamW(model.parameters(), lr=args.lr, correct_bias=False)
 
     epochs = 10
 
-    total_steps = len(train_dataloader) * epochs
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+    total_steps = len(train_dataloader) // args.batch_size * args.epochs
+    total_steps = total_steps if len(train_dataloader) % args.batch_size == 0 else total_steps + 1
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warm_up_ratio * total_steps,
+                                                num_training_steps=total_steps)
 
-    count = 0
     epoch = 1
     while epoch <= epochs:
         model.train()
-        with tqdm(total=len(train_dataloader), desc='模型训练进度条') as pbar:
+        with tqdm(total=len(train_dataloader), desc='Epoch：%d，模型训练进度条' % epoch) as pbar:
             for step, batch in train_dataloader:
                 texts, rels, token_ids, token_type_ids, attention_mask, sub_heads, sub_tails, obj_heads, obj_tails = batch
 
@@ -187,3 +187,22 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             metric(dev_dataloader, id2label)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--file_path', help='训练数据路径', type=str, default='/tmp/DuIE2.0/')
+    parser.add_argument('--bert_model_path', help='预训练模型路径', type=str, default='/tmp/chinese-roberta-wwm-ext')
+    parser.add_argument('--epochs', help='训练轮数', type=int, default=100)
+    parser.add_argument('--dropout', help='', type=float, default=0.5)
+    parser.add_argument('--warm_up_ratio', help='', type=float, default=0.1)
+    parser.add_argument('--embedding_size', help='', type=int, default=100)
+    parser.add_argument('--batch_size', help='', type=int, default=32)
+    parser.add_argument('--hidden_size', help='', type=int, default=200)
+    parser.add_argument('--num_layers', help='', type=int, default=1)
+    parser.add_argument('--lr', help='学习率', type=float, default=1e-3)
+    parser.add_argument('--mode', help='长文本处理方式', type=str, default='cut')
+    parser.add_argument('--model_path', help='模型存储路径', type=str, default='/tmp/bq_corpus/bq_sbert.pt')
+    args = parser.parse_args()
+
+    train()
